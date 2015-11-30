@@ -3,23 +3,18 @@ package com.loginsight.bench.lucene;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.util.Properties;
 
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat.Mode;
 import org.apache.lucene.codecs.lucene53.Lucene53Codec;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.Field.Store;
-import org.apache.lucene.document.FieldType;
-import org.apache.lucene.document.SortedDocValuesField;
-import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.DocValuesType;
-import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
@@ -28,38 +23,11 @@ import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
-import org.apache.lucene.util.BytesRef;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class LuceneIndexingBench {
-  
-  final static FieldType STORE_FIELD_TYPE = new FieldType();
-  final static FieldType META_FIELD_TYPE = new FieldType();
-  final static FieldType META_NUMERIC_FIELD_TYPE = new FieldType();
-  static {
-    STORE_FIELD_TYPE.setStored(true);
-    STORE_FIELD_TYPE.setTokenized(false);
-    STORE_FIELD_TYPE.setIndexOptions(IndexOptions.NONE);
-    STORE_FIELD_TYPE.setDocValuesType(DocValuesType.NONE);
-    STORE_FIELD_TYPE.setStoreTermVectors(false);
-    STORE_FIELD_TYPE.freeze();
-    
-    META_FIELD_TYPE.setStored(false);
-    META_FIELD_TYPE.setTokenized(false);
-    META_FIELD_TYPE.setIndexOptions(IndexOptions.DOCS);
-    META_FIELD_TYPE.setDocValuesType(DocValuesType.SORTED);
-    META_FIELD_TYPE.setStoreTermVectors(false);
-    META_FIELD_TYPE.freeze();
-    
-    META_NUMERIC_FIELD_TYPE.setStored(false);
-    META_NUMERIC_FIELD_TYPE.setTokenized(false);
-    META_NUMERIC_FIELD_TYPE.setIndexOptions(IndexOptions.DOCS);
-    META_NUMERIC_FIELD_TYPE.setDocValuesType(DocValuesType.NUMERIC);
-    META_NUMERIC_FIELD_TYPE.setStoreTermVectors(false);
-    META_NUMERIC_FIELD_TYPE.freeze();
-  }
   
   static IndexWriter buildIndexWriter(Directory dir) throws Exception {
     IndexWriterConfig writerConfig = new IndexWriterConfig(new WhitespaceAnalyzer());
@@ -77,36 +45,31 @@ public class LuceneIndexingBench {
     IndexWriterConfig writerConfig = new IndexWriterConfig(new StandardAnalyzer());
     writerConfig.setUseCompoundFile(false);
     return new IndexWriter(dir, writerConfig);
-  }
-  
-  static Document buildDocument(JsonObject json, String originalJson) {
-    Document doc = new Document();
-    if (originalJson != null) {
-      doc.add(new Field("_stored", originalJson.getBytes(StandardCharsets.UTF_8), STORE_FIELD_TYPE));
-    }
-    doc.add(new TextField("text", json.get("message").getAsString(), Store.NO));    
-    doc.add(new TextField("path", json.get("path").getAsString(), Store.NO));
-    doc.add(new TextField("logger_name", json.get("logger_name").getAsString(), Store.NO));    
-    doc.add(new TextField("thread", json.get("thread").getAsString(), Store.NO));
-    doc.add(new TextField("class", json.get("class").getAsString(), Store.NO));
-    doc.add(new TextField("file", json.get("file").getAsString(), Store.NO));
-    doc.add(new TextField("method", json.get("method").getAsString(), Store.NO));
-    
-    String priority = json.get("priority").getAsString();            
-    doc.add(new SortedDocValuesField("priority", new BytesRef(priority)));
-    doc.add(new SortedDocValuesField("type", new BytesRef(json.get("type").getAsString())));
-    doc.add(new SortedDocValuesField("timestamp", new BytesRef(json.get("@timestamp").getAsString())));
-    return doc;
-  }
+  }  
   
   public static void main(String args[]) throws Exception{
-    File dataFile = new File("/Users/john/bitbucket/logparser/logs/logs.json");    
-    Path idxPath = FileSystems.getDefault().getPath("/tmp/john_test");
+    
+    FileReader confFileReader = new FileReader(new File(args[0]));
+    Properties config = new Properties();
+    config.load(confFileReader);
+    confFileReader.close();
+    
+    File dataFile = new File(config.getProperty("data.dir"));
+    System.out.println("data file: " + dataFile.getAbsolutePath());
+    Path idxPath = FileSystems.getDefault().getPath(config.getProperty("index.dir"));
+    System.out.println("target index dir: " + idxPath.toString());
     
     FSDirectory fsDir = FSDirectory.open(idxPath);
     
-    int numDocsPerSegment = 500000;
-    boolean withStore = true;
+    int numDocsPerSegment = Integer.parseInt(config.getProperty("docs.per.segment"));
+    System.out.println("num docs per segment: " + numDocsPerSegment);
+    
+    boolean withStore = Boolean.parseBoolean(config.getProperty("rawstore"));
+    System.out.println("store raw data: " + withStore);
+    
+    DocBuilder docBuilder = (DocBuilder) Class.forName(config.getProperty("docbuilder.class")).newInstance();
+    
+    System.out.println("doc builder: " + docBuilder.getClass());
     
     JsonParser parser = new JsonParser();
     BufferedReader reader = new BufferedReader(
@@ -119,6 +82,7 @@ public class LuceneIndexingBench {
     
     int numIndexed = 0;
     long totalTime = 0L;
+    long tatalBytes = 0L;
     while(true) {
       String line = reader.readLine();
       if (line == null) {
@@ -126,13 +90,21 @@ public class LuceneIndexingBench {
         break;
       }
       JsonObject json = parser.parse(line).getAsJsonObject();
+      
+      byte[] storedBytes = line.getBytes(StandardCharsets.UTF_8);
       long start = System.currentTimeMillis();
-      Document doc = buildDocument(json, withStore ? line : null);
+      Document doc = docBuilder.build(json, withStore ? storedBytes : null);
+      if (doc == null) {
+        continue;
+      }
       ramWriter.addDocument(doc);
       numIndexed++;
+      tatalBytes += storedBytes.length;
       if (numIndexed % numDocsPerSegment == 0) {  // batched reached
         System.out.println("flushing batch, numDocs indexed so far: " + numIndexed + ", took: " + totalTime/1000+"s");
-        System.out.println("current indexing rate per second: " + (double)numIndexed * 1000 / (double) totalTime);
+        System.out.println("current indexing rate per second: " 
+            + (double)numIndexed * 1000 / (double) totalTime + "docs, "
+            + (double)tatalBytes / (double) totalTime / 1000.0 + "mb");
         ramWriter.forceMerge(1);
         ramWriter.commit();
         ramWriter.close();
@@ -149,7 +121,9 @@ public class LuceneIndexingBench {
     diskWriter.commit();
     diskWriter.close();
     System.out.println("flushing batch, numDocs indexed so far: " + numIndexed + ", took: " + totalTime/1000+"s");
-    System.out.println("current indexing rate per second: " + (double)numIndexed * 1000 / (double) totalTime);
+    System.out.println("current indexing rate per second: " 
+        + (double)numIndexed * 1000 / (double) totalTime + "docs, "
+        + (double)tatalBytes / (double) totalTime / 1000.0 + "mb");
     System.out.println("indexing completed");
   }
 }
