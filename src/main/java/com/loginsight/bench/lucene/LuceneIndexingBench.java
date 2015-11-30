@@ -10,7 +10,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.Properties;
 
-import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.codecs.lucene50.Lucene50StoredFieldsFormat.Mode;
 import org.apache.lucene.codecs.lucene53.Lucene53Codec;
@@ -30,7 +29,7 @@ import com.google.gson.JsonParser;
 public class LuceneIndexingBench {
   
   static IndexWriter buildIndexWriter(Directory dir) throws Exception {
-    IndexWriterConfig writerConfig = new IndexWriterConfig(new WhitespaceAnalyzer());
+    IndexWriterConfig writerConfig = new IndexWriterConfig(new StandardAnalyzer());
     writerConfig.setCodec(new Lucene53Codec(Mode.BEST_COMPRESSION));
     writerConfig.setMaxBufferedDocs(1000000);
     writerConfig.setOpenMode(OpenMode.CREATE_OR_APPEND);
@@ -89,14 +88,23 @@ public class LuceneIndexingBench {
         // reached end of data file
         break;
       }
-      JsonObject json = parser.parse(line).getAsJsonObject();
+      
       
       byte[] storedBytes = line.getBytes(StandardCharsets.UTF_8);
-      long start = System.currentTimeMillis();
-      Document doc = docBuilder.build(json, withStore ? storedBytes : null);
+      
+      Document doc = null;
+      
+      try {
+        JsonObject json = parser.parse(line).getAsJsonObject();
+        doc = docBuilder.build(json, withStore ? storedBytes : null);
+      } catch (Exception e) {
+        // possible corrupt data, log it and ignore;
+       // System.out.println("skip corrupt element: " + line +", numskipped: " + skippedCount++ + ", current processed: " + numIndexed);
+      }
       if (doc == null) {
         continue;
       }
+      long start = System.currentTimeMillis();
       ramWriter.addDocument(doc);
       numIndexed++;
       tatalBytes += storedBytes.length;
