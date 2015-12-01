@@ -8,6 +8,7 @@ import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.SortedDocValuesField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.util.BytesRef;
+//import system;
 
 import com.google.gson.JsonObject;
 
@@ -17,13 +18,18 @@ public class TweetsDocBuilder extends DocBuilder {
   public Document build(JsonObject json, byte[] originalJson) {
     Document doc = new Document();
     
+    /*
     if (json.get("delete") != null) {
       // delete tweet, skip
       return null;
     }
+    */
     
     if (originalJson != null) {
       doc.add(new Field("_stored", originalJson, STORE_FIELD_TYPE));
+    }else{
+      System.out.println("originalJson is null");
+      System.exit(-1); 
     }
     
     
