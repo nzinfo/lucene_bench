@@ -82,6 +82,7 @@ public class LuceneIndexingBench {
     int numIndexed = 0;
     long totalTime = 0L;
     long tatalBytes = 0L;
+    int numSkipped = 0;
     while(true) {
       String line = reader.readLine();
       if (line == null) {
@@ -102,6 +103,7 @@ public class LuceneIndexingBench {
        // System.out.println("skip corrupt element: " + line +", numskipped: " + skippedCount++ + ", current processed: " + numIndexed);
       }
       if (doc == null) {
+        numSkipped ++;
         continue;
       }
       long start = System.currentTimeMillis();
@@ -128,10 +130,11 @@ public class LuceneIndexingBench {
     reader.close();
     diskWriter.commit();
     diskWriter.close();
-    System.out.println("flushing batch, numDocs indexed so far: " + numIndexed + ", took: " + totalTime/1000+"s");
-    System.out.println("current indexing rate per second: " 
+    System.out.println("numDocs indexed so far: " + numIndexed + ", took: " + totalTime/1000+"s");
+    System.out.println("indexing rate per second: " 
         + (double)numIndexed * 1000 / (double) totalTime + "docs, "
         + (double)tatalBytes / (double) totalTime / 1000.0 + "mb");
+    System.out.println("numDocs skipped: " + numSkipped);
     System.out.println("indexing completed");
   }
 }
