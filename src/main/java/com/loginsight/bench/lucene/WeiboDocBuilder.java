@@ -65,7 +65,7 @@ public class WeiboDocBuilder extends DocBuilder {
     */
     
     if (originalJson != null) {
-      doc.add(new Field("_stored", originalJson, STORE_FIELD_TYPE));
+      //doc.add(new Field("_stored", originalJson, STORE_FIELD_TYPE));
     }else{
       System.out.println("originalJson is null");
       System.exit(-1); 
@@ -81,9 +81,9 @@ public class WeiboDocBuilder extends DocBuilder {
     long commentnum = getWithDefaultLong(json, "g", 0L);
     long rtnum = getWithDefaultLong(json, "h", 0L);
     
-    doc.add(new LongField("uid", uid, Field.Store.YES));
-    doc.add(new LongField("commentnum", commentnum, Field.Store.YES));
-    doc.add(new LongField("rtnum", rtnum, Field.Store.YES));
+    doc.add(new LongField("uid", uid, Field.Store.NO));
+    doc.add(new LongField("commentnum", commentnum, Field.Store.NO));
+    doc.add(new LongField("rtnum", rtnum, Field.Store.NO));
     
     //doc.add(new SortedDocValuesField("retweeted", new BytesRef(getWithDefault(json, "retweeted", ""))));
     //doc.add(new SortedDocValuesField("created_at", new BytesRef(getWithDefault(json, "created_at", ""))));
