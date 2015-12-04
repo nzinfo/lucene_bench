@@ -9,7 +9,7 @@ import org.apache.lucene.util.BytesRef;
 
 import com.google.gson.JsonObject;
 
-public class Log4jDocBuilder extends DocBuilder {
+public class Log4jDocBuilder extends JsonDocBuilder {
 
   @Override
   public Document build(JsonObject json, byte[] originalJson) {
