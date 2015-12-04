@@ -4,15 +4,12 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.LongField;
-import org.apache.lucene.document.NumericDocValuesField;
-import org.apache.lucene.document.SortedDocValuesField;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.util.BytesRef;
-//import system;
 
 import com.google.gson.JsonObject;
+//import system;
 
-public class WeiboDocBuilder extends DocBuilder {
+public class WeiboDocBuilder extends JsonDocBuilder {
 
   @Override
   public Document build(JsonObject json, byte[] originalJson) {

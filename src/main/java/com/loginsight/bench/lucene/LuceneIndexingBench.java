@@ -23,9 +23,6 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 public class LuceneIndexingBench {
   
   static IndexWriter buildIndexWriter(Directory dir) throws Exception {
@@ -70,7 +67,6 @@ public class LuceneIndexingBench {
     
     System.out.println("doc builder: " + docBuilder.getClass());
     
-    JsonParser parser = new JsonParser();
     BufferedReader reader = new BufferedReader(
         new InputStreamReader(new FileInputStream(dataFile), StandardCharsets.UTF_8));
     
@@ -89,15 +85,13 @@ public class LuceneIndexingBench {
         // reached end of data file
         break;
       }
-      
-      
+            
       byte[] storedBytes = line.getBytes(StandardCharsets.UTF_8);
       
       Document doc = null;
       
       try {
-        JsonObject json = parser.parse(line).getAsJsonObject();
-        doc = docBuilder.build(json, withStore ? storedBytes : null);
+        doc = docBuilder.build(line, withStore ? storedBytes : null);
       } catch (Exception e) {
         // possible corrupt data, log it and ignore;
        // System.out.println("skip corrupt element: " + line +", numskipped: " + skippedCount++ + ", current processed: " + numIndexed);
